@@ -29,6 +29,8 @@ module OpenID
      [#{BASE64_CHARS}]{3}=)?
     \\Z", Regexp::EXTENDED)
 
+    HTML_FORM_ID = 'openid_transaction_in_progress'
+
     def Util.assert(value, message=nil)
       if not value
         raise AssertionError, message or value
@@ -74,39 +76,37 @@ module OpenID
       url << Util.urlencode(args)
     end
 
-    @@logger = Logger.new(STDERR)
-    @@logger.progname = "OpenID"
-
     def Util.logger=(logger)
       @@logger = logger
     end
 
     def Util.logger
-      @@logger
+      @@logger ||= Logger.new(STDERR, { :progname => 'OpenID' })
     end
 
     # change the message below to do whatever you like for logging
     def Util.log(message)
-      logger.info(message)
+      Util.logger.info(message)
     end
 
     def Util.auto_submit_html(form, title='OpenID transaction in progress')
-      return "
-<html>
-<head>
-  <title>#{title}</title>
-</head>
-<body onload='document.forms[0].submit();'>
-#{form}
-<script>
-var elements = document.forms[0].elements;
-for (var i = 0; i < elements.length; i++) {
-  elements[i].style.display = \"none\";
-}
-</script>
-</body>
-</html>
-"
+      return "<html>
+                <head>
+                  <title>#{title}</title>
+                  <style>form { visibility: hidden }</style>
+                  <script>
+                    var server_proceed = setTimeout(function() {
+                      if (typeof document.getElementById('#{HTML_FORM_ID}') == 'object') {
+                        clearTimeout(server_proceed);
+                        document.getElementById('#{HTML_FORM_ID}').submit();
+                      }
+                    }, 100);
+                  </script>
+                </head>
+                <body>
+                  #{form}
+                </body>
+              </html>"
     end
 
     ESCAPE_TABLE = { '&' => '&amp;', '<' => '&lt;', '>' => '&gt;', '"' => '&quot;', "'" => '&#039;' }
